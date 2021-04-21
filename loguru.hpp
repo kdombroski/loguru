@@ -362,8 +362,10 @@ namespace loguru
 		// You would generally print a Message by just concatenating the buffers without spacing.
 		// Optionally, ignore preamble and indentation.
 		Verbosity   verbosity;   // Already part of preamble
+		long long   timestamp;   // Already part of preamble
 		const char* filename;    // Already part of preamble
 		unsigned    line;        // Already part of preamble
+		const char* thread;      // Already part of preamble
 		const char* preamble;    // Date, time, uptime, thread, file:line, verbosity.
 		const char* indentation; // Just a bunch of spacing.
 		const char* prefix;      // Assertion failure info goes here (or "").

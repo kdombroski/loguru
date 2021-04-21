@@ -1300,7 +1300,7 @@ namespace loguru
 		}
 	}
 
-	static void print_preamble(char* out_buff, size_t out_buff_size, Verbosity verbosity, const char* file, unsigned line)
+	static void print_preamble(char* out_buff, size_t out_buff_size, Verbosity verbosity, const char* thread_name, const char* file, unsigned line)
 	{
 		if (out_buff_size == 0) { return; }
 		out_buff[0] = '\0';
@@ -1312,9 +1312,6 @@ namespace loguru
 
 		auto uptime_ms = duration_cast<milliseconds>(steady_clock::now() - s_start_time).count();
 		auto uptime_sec = static_cast<double> (uptime_ms) / 1000.0;
-
-		char thread_name[LOGURU_THREADNAME_WIDTH + 1] = {0};
-		get_thread_name(thread_name, LOGURU_THREADNAME_WIDTH + 1, true);
 
 		if (s_strip_file_path) {
 			file = filename(file);
@@ -1488,9 +1485,12 @@ namespace loguru
 	                       const char* file, unsigned line,
 	                       const char* prefix, const char* buff)
 	{
+		long long ms_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		char thread_name[LOGURU_THREADNAME_WIDTH + 1] = {0};
+		get_thread_name(thread_name, LOGURU_THREADNAME_WIDTH + 1, true);
 		char preamble_buff[LOGURU_PREAMBLE_WIDTH];
-		print_preamble(preamble_buff, sizeof(preamble_buff), verbosity, file, line);
-		auto message = Message{verbosity, file, line, preamble_buff, "", prefix, buff};
+		print_preamble(preamble_buff, sizeof(preamble_buff), verbosity, thread_name, file, line);
+		auto message = Message{verbosity, ms_since_epoch, file, line, thread_name, preamble_buff, "", prefix, buff};
 		log_message(stack_trace_skip + 1, message, true, true);
 	}
 
@@ -1503,8 +1503,9 @@ namespace loguru
 
 	void raw_vlog(Verbosity verbosity, const char* file, unsigned line, const char* format, fmt::format_args args)
 	{
+		long long ms_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 		auto formatted = fmt::vformat(format, args);
-		auto message = Message{verbosity, file, line, "", "", "", formatted.c_str()};
+		auto message = Message{verbosity, ms_since_epoch, file, line, "", "", "", "", formatted.c_str()};
 		log_message(1, message, false, true);
 	}
 #else
@@ -1524,10 +1525,11 @@ namespace loguru
 
 	void raw_log(Verbosity verbosity, const char* file, unsigned line, const char* format, ...)
 	{
+		long long ms_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 		va_list vlist;
 		va_start(vlist, format);
 		auto buff = vtextprintf(format, vlist);
-		auto message = Message{verbosity, file, line, "", "", "", buff.c_str()};
+		auto message = Message{verbosity, ms_since_epoch, file, line, "", "", "", "", buff.c_str()};
 		log_message(1, message, false, true);
 		va_end(vlist);
 	}
@@ -1972,9 +1974,12 @@ namespace loguru
 			*/
 
 			flush();
+			long long ms_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+			char thread_name[LOGURU_THREADNAME_WIDTH + 1] = {0};
+			get_thread_name(thread_name, LOGURU_THREADNAME_WIDTH + 1, true);
 			char preamble_buff[LOGURU_PREAMBLE_WIDTH];
-			print_preamble(preamble_buff, sizeof(preamble_buff), Verbosity_FATAL, "", 0);
-			auto message = Message{Verbosity_FATAL, "", 0, preamble_buff, "", "Signal: ", signal_name};
+			print_preamble(preamble_buff, sizeof(preamble_buff), Verbosity_FATAL, thread_name, "", 0);
+			auto message = Message{Verbosity_FATAL, ms_since_epoch, "", 0, thread_name, preamble_buff, "", "Signal: ", signal_name};
 			try {
 				log_message(1, message, false, false);
 			} catch (...) {
