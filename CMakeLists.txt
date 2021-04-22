@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(fmt REQUIRED)
 
 add_library(loguru STATIC loguru.cpp)
+add_library(loguru::loguru ALIAS loguru)
 
 target_link_libraries(loguru PUBLIC dl fmt::fmt)
 target_compile_definitions(loguru PUBLIC LOGURU_USE_FMTLIB)
