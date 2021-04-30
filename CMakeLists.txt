@@ -5,7 +5,10 @@ project(loguru LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(fmt REQUIRED)
+# if fmt is not already in the environment, find it
+if(NOT TARGET fmt::fmt)
+    find_package(fmt REQUIRED)
+endif()
 
 add_library(loguru STATIC loguru.cpp)
 add_library(loguru::loguru ALIAS loguru)
