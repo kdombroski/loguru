@@ -1,7 +1,7 @@
 @PACKAGE_INIT@
 
-include("${CMAKE_CURRENT_LIST_DIR}/marslogging-targets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/loguru-targets.cmake")
 
 find_package(fmt REQUIRED)
 
-check_required_components(MARSLogging)
+check_required_components(loguru)
