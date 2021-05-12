@@ -2,7 +2,7 @@
 # Maintainer: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
 pkgname=mbi-loguru
 pkgver=2.1.0
-pkgrel=12
+pkgrel=14
 pkgdesc="A lightweight C++ logging library"
 url="https://github.com/emilk/loguru"
 arch="all"
@@ -14,6 +14,7 @@ source=""
 builddir=""
 srcdir="tempsrc"
 options="!check"
+filter_xattrs_selinux=1
 
 build() {
 	cmake -B build \
