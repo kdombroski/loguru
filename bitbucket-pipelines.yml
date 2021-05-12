@@ -3,6 +3,7 @@ definitions:
     - step: &build
         name: build
         image: alpine:3.13
+        # NOTE: alpine version in image must match that in PACKAGE_DISTRIBUTION below
         script:
           - apk add curl bash
           - curl -1sLf "https://dl.cloudsmith.io/$CLOUDSMITH_SERIESB_READ_KEY/mars-bioimaging/series-b-autobuild/setup.alpine.sh" | bash
@@ -23,7 +24,7 @@ definitions:
             CLOUDSMITH_REPOSITORY: mars-bioimaging/series-b-autobuild
             CLOUDSMITH_API_KEY: $CLOUDSMITH_SERIESB_UPLOAD_API_KEY
             PACKAGE_FORMAT: alpine
-            PACKAGE_DISTRIBUTION: alpine/any-version
+            PACKAGE_DISTRIBUTION: alpine/3.13
             PACKAGE_PATH: out/*/*/*.apk
             # N.B. The package version and other metadata are read from the built package itself.
 
