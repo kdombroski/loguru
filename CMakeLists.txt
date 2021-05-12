@@ -5,10 +5,14 @@ project(loguru LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(CheckLibraryExists)
+
 # if fmt is not already in the environment, find it
 if(NOT TARGET fmt::fmt)
     find_package(fmt REQUIRED)
 endif()
+
+check_library_exists(execinfo backtrace "" LINK_TO_EXECINFO)
 
 add_library(loguru STATIC loguru.cpp)
 add_library(loguru::loguru ALIAS loguru)
@@ -19,6 +23,10 @@ target_include_directories(loguru PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/>"
     "$<INSTALL_INTERFACE:include/loguru>"
 )
+
+if(LINK_TO_EXECINFO)
+    target_link_libraries(loguru PUBLIC execinfo)
+endif()
 
 # files in public_header property get installed
 set_target_properties(loguru PROPERTIES PUBLIC_HEADER "loguru.hpp")
