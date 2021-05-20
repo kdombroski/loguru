@@ -2,30 +2,20 @@ definitions:
   steps:
     - step: &build
         name: build
-        image: alpine:3.13
-        # NOTE: alpine version in image must match that in PACKAGE_DISTRIBUTION below
+        image: docker.cloudsmith.io/mars-bioimaging/infra/alpine-build-base:latest
         script:
-          - apk add curl bash
-          - curl -1sLf "https://dl.cloudsmith.io/$CLOUDSMITH_SERIESB_READ_KEY/mars-bioimaging/series-b-autobuild/setup.alpine.sh" | bash
-          - apk add mbi-abuild
-          - apk add alpine-sdk
-          - abuild-keygen -an # ephemeral signing key
-          - abuild -c -F -r -P $(pwd)/out all
+          - mbi-require-tools 0
+          - mbi-setup-cloudsmith-consumer ${CLOUDSMITH_SERIESB_READ_KEY}
+          - mbi-install-tools alpine
+          - mbi-build-apk
         artifacts:
-          # alpine encodes the name of the parent directory (repo name) in the output structure.
-          # TRAP: You don't get this in bbrun by default, as it runs in /ws ...
-          - out/*/*/*.apk
+          - out/*.apk
     - step: &publish
-        name: publish to cloudsmith
-        image: alpine
+        name: publish
+        image: docker.cloudsmith.io/mars-bioimaging/infra/alpine-build-base:latest
         script:
-        - pipe: cloudsmith-io/publish:0.1.1
-          variables:
-            CLOUDSMITH_REPOSITORY: mars-bioimaging/series-b-autobuild
-            CLOUDSMITH_API_KEY: $CLOUDSMITH_SERIESB_UPLOAD_API_KEY
-            PACKAGE_FORMAT: alpine
-            PACKAGE_DISTRIBUTION: alpine/3.13
-            PACKAGE_PATH: out/*/*/*.apk
+          - mbi-install-tools cloudsmith_alpine
+          - mbi-cloudsmith-push -k$CLOUDSMITH_SERIESB_UPLOAD_API_KEY out/*.apk
             # N.B. The package version and other metadata are read from the built package itself.
 
 pipelines:
