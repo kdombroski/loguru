@@ -1,8 +1,8 @@
 # Contributor: MBI <series-b-team@marsbioimaging.com>
 # Maintainer: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
-pkgname=mbi-loguru
+pkgname=mbi-loguru-dev
 pkgver=2.1.0
-pkgrel=17
+pkgrel=18
 pkgdesc="A lightweight C++ logging library"
 url="https://github.com/emilk/loguru"
 arch="all"
