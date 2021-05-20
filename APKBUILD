@@ -12,15 +12,15 @@ makedepends="cmake linux-headers"
 options="!check"
 
 build() {
-	cmake -B build \
+	cmake -B ${builddir} \
 		-DCMAKE_INSTALL_PREFIX=/usr \
 		-DCMAKE_INSTALL_LIBDIR=lib \
 		-DBUILD_SHARED_LIBS=False \
 		-DCMAKE_BUILD_TYPE=None \
 		.
-	cmake --build build
+	cmake --build ${builddir}
 }
 
 package() {
-	DESTDIR="$pkgdir" cmake --install build
+	DESTDIR="$pkgdir" cmake --install ${builddir}
 }
