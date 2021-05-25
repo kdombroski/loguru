@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckLibraryExists)
 
+find_package(Threads REQUIRED)
+
 # if fmt is not already in the environment, find it
 if(NOT TARGET fmt::fmt)
     find_package(fmt REQUIRED)
@@ -17,7 +19,7 @@ check_library_exists(execinfo backtrace "" LINK_TO_EXECINFO)
 add_library(loguru STATIC loguru.cpp)
 add_library(loguru::loguru ALIAS loguru)
 
-target_link_libraries(loguru PUBLIC dl fmt::fmt)
+target_link_libraries(loguru PUBLIC dl Threads::Threads fmt::fmt)
 target_compile_definitions(loguru PUBLIC LOGURU_USE_FMTLIB)
 target_include_directories(loguru PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/>"
