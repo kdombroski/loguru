@@ -1,7 +1,7 @@
 definitions:
   steps:
     - step: &build
-        name: build
+        name: apk
         image: docker.cloudsmith.io/mars-bioimaging/infra/alpine-build-base:latest
         script:
           - mbi-require-tools 0

@@ -7,8 +7,8 @@ pkgdesc="A lightweight C++ logging library"
 url="https://github.com/emilk/loguru"
 arch="all"
 license="PD-loguru"
-depends="fmt-dev~7 libexecinfo-dev"
-makedepends="cmake linux-headers"
+depends="fmt~7 libexecinfo"
+makedepends="cmake linux-headers fmt-dev~7 libexecinfo-dev"
 options="!check"
 
 build() {
