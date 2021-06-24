@@ -30,6 +30,16 @@ if(LINK_TO_EXECINFO)
     target_link_libraries(loguru PUBLIC execinfo)
 endif()
 
+# backtrace is unstable on alpine (musl), so forcibly disable it unless we know it works
+# this isn't 100% correct (it only enables on glibc) but it will serve our purposes for now.
+# NB that musl does not provide a corresponding identification #define .
+include(CheckSymbolExists)
+check_symbol_exists(__GLIBC__ "features.h" LIBC_IS_GLIBC)
+if(NOT LIBC_IS_GLIBC)
+    target_compile_definitions(loguru PRIVATE LOGURU_STACKTRACES=0)
+    message("glibc not detected: disabling backtraces")
+endif()
+
 # files in public_header property get installed
 set_target_properties(loguru PROPERTIES PUBLIC_HEADER "loguru.hpp")
 

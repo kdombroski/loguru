@@ -2,13 +2,13 @@
 # Maintainer: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
 pkgname=mbi-loguru-dev
 pkgver=2.1.0
-pkgrel=19
+pkgrel=20
 pkgdesc="A lightweight C++ logging library"
 url="https://github.com/emilk/loguru"
 arch="all"
 license="PD-loguru"
-depends="fmt~7 libexecinfo"
-makedepends="cmake linux-headers fmt-dev~7 libexecinfo-dev"
+depends="fmt~7"
+makedepends="cmake linux-headers fmt-dev~7"
 options="!check"
 
 build() {
