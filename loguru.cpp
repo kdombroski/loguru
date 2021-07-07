@@ -225,7 +225,7 @@ namespace loguru
 			}
 			return false;
 		#else
-			if (!isatty(STDERR_FILENO)) {
+			if (isatty(STDERR_FILENO) == 0) {
 				return false;
 			}
 			if (const char* term = getenv("TERM")) {
@@ -320,7 +320,7 @@ namespace loguru
 	void file_close(void* user_data)
 	{
 		FILE* file = to_file(user_data);
-		if (file) {
+		if (file != nullptr) {
 			fclose(file);
 		}
 #if LOGURU_WITH_FILEABS
@@ -470,7 +470,7 @@ namespace loguru
 		int out_argc = argc;
 
 		for (int arg_it = 1; arg_it < argc; ++arg_it) {
-			auto cmd = argv[arg_it];
+			auto *cmd = argv[arg_it];
 			auto arg_len = strlen(verbosity_flag);
 
 			bool last_is_alpha = false;
@@ -487,7 +487,7 @@ namespace loguru
 
 			if (strncmp(cmd, verbosity_flag, arg_len) == 0 && !last_is_alpha) {
 				out_argc -= 1;
-				auto value_str = cmd + arg_len;
+				auto *value_str = cmd + arg_len;
 				if (value_str[0] == '\0') {
 					// Value in separate argument
 					arg_it += 1;
@@ -523,7 +523,7 @@ namespace loguru
 	// Returns the part of the path after the last / or \ (if any).
 	const char* filename(const char* path)
 	{
-		for (auto ptr = path; *ptr; ++ptr) {
+		for (auto const *ptr = path; *ptr != 0; ++ptr) {
 			if (*ptr == '/' || *ptr == '\\') {
 				path = ptr + 1;
 			}
@@ -606,7 +606,7 @@ namespace loguru
 			#define getcwd _getcwd
 		#endif
 
-		if (!getcwd(s_current_dir, sizeof(s_current_dir))) {
+		if (getcwd(s_current_dir, sizeof(s_current_dir)) == nullptr) {
 			const auto error_text = errno_as_text();
 			LOG_F(WARNING, "Failed to get current working directory: " LOGURU_FMT(s) "", error_text.c_str());
 		}
@@ -619,11 +619,11 @@ namespace loguru
 			}
 		}
 
-		if (options.verbosity_flag) {
+		if (options.verbosity_flag != nullptr) {
 			parse_args(argc, argv, options.verbosity_flag);
 		}
 
-		if (const auto main_thread_name = options.main_thread_name) {
+		if (const auto *main_thread_name = options.main_thread_name) {
 			#if LOGURU_PTLS_NAMES || LOGURU_WINTHREADS
 				set_thread_name(main_thread_name);
 			#elif LOGURU_PTHREADS
@@ -708,7 +708,7 @@ namespace loguru
 	const char* home_dir()
 	{
 		#ifdef __MINGW32__
-			auto home = getenv("USERPROFILE");
+			auto *home = getenv("USERPROFILE");
 			CHECK_F(home != nullptr, "Missing USERPROFILE");
 			return home;
 		#elif defined(_WIN32)
@@ -718,7 +718,7 @@ namespace loguru
 			CHECK_F(err == 0, "Missing USERPROFILE");
 			return user_profile;
 		#else // _WIN32
-			auto home = getenv("HOME");
+			auto *home = getenv("HOME");
 			CHECK_F(home != nullptr, "Missing HOME");
 			return home;
 		#endif // _WIN32
@@ -759,7 +759,7 @@ namespace loguru
 	{
 		CHECK_F(file_path_const && *file_path_const);
 		char* file_path = STRDUP(file_path_const);
-		for (char* p = strchr(file_path + 1, '/'); p; p = strchr(p + 1, '/')) {
+		for (char* p = strchr(file_path + 1, '/'); p != nullptr; p = strchr(p + 1, '/')) {
 			*p = '\0';
 
 	#ifdef _WIN32
@@ -805,7 +805,7 @@ namespace loguru
 	#else
 		file = fopen(path, mode_str);
 	#endif
-		if (!file) {
+		if (file == nullptr) {
 			LOG_F(ERROR, "Failed to open '" LOGURU_FMT(s) "'", path);
 			return false;
 		}
@@ -936,12 +936,12 @@ namespace loguru
 	// See also set_verbosity_to_name_callback.
 	const char* get_verbosity_name(Verbosity verbosity)
 	{
-		auto name = s_verbosity_to_name_callback
+		auto const *name = (s_verbosity_to_name_callback != nullptr)
 				? (*s_verbosity_to_name_callback)(verbosity)
 				: nullptr;
 
 		// Use standard replacements if callback fails:
-		if (!name)
+		if (name == nullptr)
 		{
 			if (verbosity <= Verbosity_FATAL) {
 				name = "FATL";
@@ -961,7 +961,7 @@ namespace loguru
 	// See also set_name_to_verbosity_callback.
 	Verbosity get_verbosity_from_name(const char* name)
 	{
-		auto verbosity = s_name_to_verbosity_callback
+		auto verbosity = (s_name_to_verbosity_callback != nullptr)
 				? (*s_name_to_verbosity_callback)(name)
 				: Verbosity_INVALID;
 
@@ -988,7 +988,7 @@ namespace loguru
 		std::lock_guard<std::recursive_mutex> lock(s_mutex);
 		auto it = std::find_if(begin(s_callbacks), end(s_callbacks), [&](const Callback& c) { return c.id == id; });
 		if (it != s_callbacks.end()) {
-			if (it->close) { it->close(it->user_data); }
+			if (it->close != nullptr) { it->close(it->user_data); }
 			s_callbacks.erase(it);
 			on_callback_change();
 			return true;
@@ -1002,7 +1002,7 @@ namespace loguru
 	{
 		std::lock_guard<std::recursive_mutex> lock(s_mutex);
 		for (auto& callback : s_callbacks) {
-			if (callback.close) {
+			if (callback.close != nullptr) {
 				callback.close(callback.user_data);
 			}
 		}
@@ -1298,6 +1298,7 @@ namespace loguru
 				pos += bytes;
 			}
 		}
+		(void) pos;
 	}
 
 	static void print_preamble(char* out_buff, size_t out_buff_size, Verbosity verbosity, const char* thread_name, const char* file, unsigned line)
@@ -1319,7 +1320,7 @@ namespace loguru
 
 		char level_buff[6];
 		const char* custom_level_name = get_verbosity_name(verbosity);
-		if (custom_level_name) {
+		if (custom_level_name != nullptr) {
 			snprintf(level_buff, sizeof(level_buff) - 1, "%s", custom_level_name);
 		} else {
 			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", static_cast<int8_t>(verbosity));
@@ -1377,6 +1378,7 @@ namespace loguru
 				pos += bytes;
 			}
 		}
+		(void) pos;
 	}
 
 	// stack_trace_skip is just if verbosity == FATAL.
@@ -1442,14 +1444,14 @@ namespace loguru
 				}
 				p.callback(p.user_data, message);
 				if (g_flush_interval_ms == 0) {
-					if (p.flush) { p.flush(p.user_data); }
+					if (p.flush != nullptr) { p.flush(p.user_data); }
 				} else {
 					s_needs_flushing = true;
 				}
 			}
 		}
 
-		if (g_flush_interval_ms > 0 && !s_flush_thread) {
+		if (g_flush_interval_ms > 0 && s_flush_thread == nullptr) {
 			s_flush_thread = new std::thread([](){
 				for (;;) {
 					if (s_needs_flushing) {
@@ -1463,7 +1465,7 @@ namespace loguru
 		if (message.verbosity == Verbosity_FATAL) {
 			flush();
 
-			if (s_fatal_handler) {
+			if (s_fatal_handler != nullptr) {
 				s_fatal_handler(message);
 				flush();
 			}
@@ -1541,7 +1543,7 @@ namespace loguru
 		fflush(stderr);
 		for (const auto& callback : s_callbacks)
 		{
-			if (callback.flush) {
+			if (callback.flush != nullptr) {
 				callback.flush(callback.user_data);
 			}
 		}
@@ -1565,7 +1567,7 @@ namespace loguru
 
 	LogScopeRAII::~LogScopeRAII()
 	{
-		if (_file) {
+		if (_file != nullptr) {
 			std::lock_guard<std::recursive_mutex> lock(s_mutex);
 			if (_indent_stderr && s_stderr_indentation > 0) {
 				--s_stderr_indentation;
@@ -1742,7 +1744,7 @@ namespace loguru
 	ECPtr& get_thread_ec_head_ref()
 	{
 		(void)pthread_once(&s_ec_pthread_once, ec_make_pthread_key);
-		auto ec = reinterpret_cast<ECPtr*>(pthread_getspecific(s_ec_pthread_key));
+		auto *ec = reinterpret_cast<ECPtr*>(pthread_getspecific(s_ec_pthread_key));
 		if (ec == nullptr) {
 			ec = new ECPtr(nullptr);
 			(void)pthread_setspecific(s_ec_pthread_key, ec);
@@ -1766,7 +1768,7 @@ namespace loguru
 	Text get_error_context_for(const EcEntryBase* ec_head)
 	{
 		std::vector<const EcEntryBase*> stack;
-		while (ec_head) {
+		while (ec_head != nullptr) {
 			stack.push_back(ec_head);
 			ec_head = ec_head->_previous;
 		}
@@ -1775,7 +1777,7 @@ namespace loguru
 		StringStream result;
 		if (!stack.empty()) {
 			result.str += "------------------------------------------------\n";
-			for (auto entry : stack) {
+			for (auto const *entry : stack) {
 				const auto description = std::string(entry->_descr) + ":";
 #if LOGURU_USE_FMTLIB
 				auto prefix = textprintf("[ErrorContext] {.{}s}:{:-5u} {:-20s} ",
@@ -1882,7 +1884,8 @@ namespace loguru
 	#ifdef _WIN32
 		strncpy_s(with_newline + 1, buffer_size, parent_ec.c_str(), buffer_size - 2);
 	#else
-		strcpy(with_newline + 1, parent_ec.c_str());
+		strncpy(with_newline + 1, parent_ec.c_str(), buffer_size - 1);
+		with_newline[buffer_size-1] = '\0';
 	#endif
 		return Text(with_newline);
 	}
