@@ -38,6 +38,9 @@ check_symbol_exists(__GLIBC__ "features.h" LIBC_IS_GLIBC)
 if(NOT LIBC_IS_GLIBC)
     target_compile_definitions(loguru PRIVATE LOGURU_STACKTRACES=0)
     message("glibc not detected: disabling backtraces")
+
+    # fix errno_as_text() on musl (use XSI version of strerror_r)
+    target_compile_definitions(loguru PRIVATE _POSIX_C_SOURCE=200112L)
 endif()
 
 # files in public_header property get installed
