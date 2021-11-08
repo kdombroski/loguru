@@ -1,9 +1,12 @@
+image: alpine:3.14
+
 definitions:
   steps:
     - step: &build
         name: apk
-        image: docker.cloudsmith.io/mars-bioimaging/infra/alpine-build-base:latest
         script:
+          - "[ -f mbi-build-scripts.tar.bz2 ] || wget -q https://dl.cloudsmith.io/${CLOUDSMITH_SERIESB_READ_KEY}/mars-bioimaging/series-b-autobuild/raw/names/mbi-build-scripts/versions/latest/mbi-build-scripts.tar.bz2"
+          - tar -C / -jxf mbi-build-scripts.tar.bz2
           - mbi-require-tools 0
           - mbi-setup-cloudsmith-consumer ${CLOUDSMITH_SERIESB_READ_KEY}
           - mbi-install-tools alpine
@@ -12,8 +15,9 @@ definitions:
           - out/*.apk
     - step: &publish
         name: publish
-        image: docker.cloudsmith.io/mars-bioimaging/infra/alpine-build-base:latest
         script:
+          - "[ -f mbi-build-scripts.tar.bz2 ] || wget -q https://dl.cloudsmith.io/${CLOUDSMITH_SERIESB_READ_KEY}/mars-bioimaging/series-b-autobuild/raw/names/mbi-build-scripts/versions/latest/mbi-build-scripts.tar.bz2"
+          - tar -C / -jxf mbi-build-scripts.tar.bz2
           - mbi-install-tools cloudsmith_alpine
           - mbi-cloudsmith-push -k$CLOUDSMITH_SERIESB_UPLOAD_API_KEY out/*.apk
             # N.B. The package version and other metadata are read from the built package itself.
