@@ -1,5 +1,5 @@
 // clang-format off
-#ifndef _WIN32
+#if defined(__GNUC__) || defined(__clang__)
 // Disable all warnings from gcc/clang:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpragmas"
@@ -12,16 +12,13 @@
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #pragma GCC diagnostic ignored "-Wmissing-prototypes"
 #pragma GCC diagnostic ignored "-Wpadded"
-#pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-macros"
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#else
-#ifdef _MSC_VER
+#elif defined(_MSC_VER)
 #pragma warning(push)
-#pragma warning(disable:4018)
-#endif // _MSC_VER
+#pragma warning(disable:4365) // conversion from 'X' to 'Y', signed/unsigned mismatch
 #endif
 
 #include "loguru.hpp"
@@ -36,6 +33,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
@@ -55,6 +53,7 @@
 
 #ifdef _WIN32
 	#include <direct.h>
+	#include <share.h>
 
 	#define localtime_r(a, b) localtime_s(b, a) // No localtime_r with MSVC, but arguments are swapped for localtime_s
 #else
@@ -85,17 +84,17 @@
 	#ifndef LOGURU_STACKTRACES
 		#define LOGURU_STACKTRACES 0
 	#endif
-#elif defined(__rtems__) || defined(__ANDROID__) || defined(__FreeBSD__)
-	#define LOGURU_PTHREADS    1
-	#define LOGURU_WINTHREADS  0
-	#ifndef LOGURU_STACKTRACES
-		#define LOGURU_STACKTRACES 0
-	#endif
 #else
 	#define LOGURU_PTHREADS    1
 	#define LOGURU_WINTHREADS  0
-	#ifndef LOGURU_STACKTRACES
-		#define LOGURU_STACKTRACES 1
+	#ifdef __GLIBC__
+		#ifndef LOGURU_STACKTRACES
+			#define LOGURU_STACKTRACES 1
+		#endif
+	#else
+		#ifndef LOGURU_STACKTRACES
+			#define LOGURU_STACKTRACES 0
+		#endif
 	#endif
 #endif
 
@@ -130,7 +129,9 @@
 		#define _WIN32_WINNT 0x0502
 	#endif
 	#define WIN32_LEAN_AND_MEAN
-	#define NOMINMAX
+	#ifndef NOMINMAX
+		#define NOMINMAX
+	#endif
 	#include <windows.h>
 #endif
 
@@ -138,6 +139,7 @@
    #define LOGURU_PTLS_NAMES 0
 #endif
 
+LOGURU_ANONYMOUS_NAMESPACE_BEGIN
 
 namespace loguru
 {
@@ -474,7 +476,20 @@ namespace loguru
 		for (int arg_it = 1; arg_it < argc; ++arg_it) {
 			auto *cmd = argv[arg_it];
 			auto arg_len = strlen(verbosity_flag);
-			if (strncmp(cmd, verbosity_flag, arg_len) == 0 && !std::isalpha(cmd[arg_len], std::locale(""))) {
+
+			bool last_is_alpha = false;
+			#if LOGURU_USE_LOCALE
+			try {  // locale variant of isalpha will throw on error
+				last_is_alpha = std::isalpha(cmd[arg_len], std::locale(""));
+			}
+			catch (...) {
+				last_is_alpha = std::isalpha(static_cast<int>(cmd[arg_len]));
+			}
+			#else
+			last_is_alpha = std::isalpha(static_cast<int>(cmd[arg_len]));
+			#endif
+
+			if (strncmp(cmd, verbosity_flag, arg_len) == 0 && !last_is_alpha) {
 				out_argc -= 1;
 				auto *value_str = cmd + arg_len;
 				if (value_str[0] == '\0') {
@@ -568,16 +583,16 @@ namespace loguru
 	Text errno_as_text()
 	{
 		char buff[256];
-	#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+	#if defined(_WIN32)
+		strerror_s(buff, sizeof(buff), errno);
+		return Text(STRDUP(buff));
+	#elif defined(__GLIBC__) && defined(_GNU_SOURCE)
 		// GNU Version
 		return Text(STRDUP(strerror_r(errno, buff, sizeof(buff))));
 	#elif defined(__APPLE__) || _POSIX_C_SOURCE >= 200112L
 		// XSI Version
 		strerror_r(errno, buff, sizeof(buff));
 		return Text(strdup(buff));
-	#elif defined(_WIN32)
-		strerror_s(buff, sizeof(buff), errno);
-		return Text(STRDUP(buff));
 	#else
 		// Not thread-safe.
 		(void)buff;
@@ -668,7 +683,7 @@ namespace loguru
 		set_name_to_verbosity_callback(nullptr);
 	}
 
-	void write_date_time(char* buff, size_t buff_size)
+	void write_date_time(char* buff, unsigned long long buff_size)
 	{
 		auto now = system_clock::now();
 		long long ms_since_epoch = duration_cast<milliseconds>(now.time_since_epoch()).count();
@@ -714,7 +729,7 @@ namespace loguru
 		#endif // _WIN32
 	}
 
-	void suggest_log_path(const char* prefix, char* buff, unsigned buff_size)
+	void suggest_log_path(const char* prefix, char* buff, unsigned long long buff_size)
 	{
 		if (prefix[0] == '~') {
 			snprintf(buff, buff_size - 1, "%s%s", home_dir(), prefix + 1);
@@ -791,12 +806,11 @@ namespace loguru
 		const char* mode_str = (mode == FileMode::Truncate ? "w" : "a");
 		FILE* file;
 	#ifdef _WIN32
-		errno_t file_error = fopen_s(&file, path, mode_str);
-		if (file_error) {
+		file = _fsopen(path, mode_str, _SH_DENYNO);
 	#else
 		file = fopen(path, mode_str);
-		if (file == nullptr) {
 	#endif
+		if (file == nullptr) {
 			LOG_F(ERROR, "Failed to open '" LOGURU_FMT(s) "'", path);
 			return false;
 		}
@@ -1246,27 +1260,48 @@ namespace loguru
 	{
 		if (out_buff_size == 0) { return; }
 		out_buff[0] = '\0';
-		long pos = 0;
+		size_t pos = 0;
 		if (g_preamble_date && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "date       ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "date       ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_time && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "time         ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "time         ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_uptime && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "( uptime  ) ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "( uptime  ) ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_thread && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]", LOGURU_THREADNAME_WIDTH, " thread name/id");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]", LOGURU_THREADNAME_WIDTH, " thread name/id");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_file && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:line  ", LOGURU_FILENAME_WIDTH, "file");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%*s:line  ", LOGURU_FILENAME_WIDTH, "file");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_verbose && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "   v");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "   v");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_pipe && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		(void) pos;
 	}
@@ -1293,39 +1328,60 @@ namespace loguru
 		if (custom_level_name != nullptr) {
 			snprintf(level_buff, sizeof(level_buff) - 1, "%s", custom_level_name);
 		} else {
-			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", verbosity);
+			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", static_cast<int8_t>(verbosity));
 		}
 
-		long pos = 0;
+		size_t pos = 0;
 
 		if (g_preamble_date && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%04d-%02d-%02d ",
-				             1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%04d-%02d-%02d ",
+				                 1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_time && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%02d:%02d:%02d.%03lld ",
-			               time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%02d:%02d:%02d.%03lld ",
+			                     time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_uptime && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "(%8.3fs) ",
-			               uptime_sec);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "(%8.3fs) ",
+			                     uptime_sec);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_thread && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]",
-			               LOGURU_THREADNAME_WIDTH, thread_name);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]",
+			                     LOGURU_THREADNAME_WIDTH, thread_name);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_file && pos < out_buff_size) {
 			char shortened_filename[LOGURU_FILENAME_WIDTH + 1];
 			snprintf(shortened_filename, LOGURU_FILENAME_WIDTH + 1, "%s", file);
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:%-5u ",
-			               LOGURU_FILENAME_WIDTH, shortened_filename, line);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%*s:%-5u ",
+			                     LOGURU_FILENAME_WIDTH, shortened_filename, line);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_verbose && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%4s",
-			               level_buff);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%4s",
+			                     level_buff);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_pipe && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		(void) pos;
 	}
@@ -1464,9 +1520,14 @@ namespace loguru
 	{
 		va_list vlist;
 		va_start(vlist, format);
+		vlog(verbosity, file, line, format, vlist);
+		va_end(vlist);
+	}
+
+	void vlog(Verbosity verbosity, const char* file, unsigned line, const char* format, va_list vlist)
+	{
 		auto buff = vtextprintf(format, vlist);
 		log_to_everywhere(1, verbosity, file, line, "", buff.c_str());
-		va_end(vlist);
 	}
 
 	void raw_log(Verbosity verbosity, const char* file, unsigned line, const char* format, ...)
@@ -1494,31 +1555,19 @@ namespace loguru
 		s_needs_flushing = false;
 	}
 
-	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, ...)
-		: _verbosity(verbosity), _file(file), _line(line)
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, va_list vlist) :
+		_verbosity(verbosity), _file(file), _line(line)
 	{
-		if (verbosity <= current_verbosity_cutoff()) {
-			std::lock_guard<std::recursive_mutex> lock(s_mutex);
-			_indent_stderr = (verbosity <= g_stderr_verbosity);
-			_start_time_ns = now_ns();
-			va_list vlist;
-			va_start(vlist, format);
-			vsnprintf(_name, sizeof(_name), format, vlist);
-			log_to_everywhere(1, _verbosity, file, line, "{ ", _name);
-			va_end(vlist);
+		this->Init(format, vlist);
+	}
 
-			if (_indent_stderr) {
-				++s_stderr_indentation;
-			}
-
-			for (auto& p : s_callbacks) {
-				if (verbosity <= p.verbosity) {
-					++p.indentation;
-				}
-			}
-		} else {
-			_file = nullptr;
-		}
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, ...) :
+		_verbosity(verbosity), _file(file), _line(line)
+	{
+		va_list vlist;
+		va_start(vlist, format);
+		this->Init(format, vlist);
+		va_end(vlist);
 	}
 
 	LogScopeRAII::~LogScopeRAII()
@@ -1548,6 +1597,29 @@ namespace loguru
 #else
 			log_to_everywhere(1, _verbosity, _file, _line, "}", "");
 #endif
+		}
+	}
+
+	void LogScopeRAII::Init(const char* format, va_list vlist)
+	{
+		if (_verbosity <= current_verbosity_cutoff()) {
+			std::lock_guard<std::recursive_mutex> lock(s_mutex);
+			_indent_stderr = (_verbosity <= g_stderr_verbosity);
+			_start_time_ns = now_ns();
+			vsnprintf(_name, sizeof(_name), format, vlist);
+			log_to_everywhere(1, _verbosity, _file, _line, "{ ", _name);
+
+			if (_indent_stderr) {
+				++s_stderr_indentation;
+			}
+
+			for (auto& p : s_callbacks) {
+				if (_verbosity <= p.verbosity) {
+					++p.indentation;
+				}
+			}
+		} else {
+			_file = nullptr;
 		}
 	}
 
@@ -1966,10 +2038,13 @@ namespace loguru
 
 #endif // _WIN32
 
-#ifdef _WIN32
-#ifdef _MSC_VER
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
 #pragma warning(pop)
-#endif // _MSC_VER
-#endif // _WIN32
+#endif
+
+LOGURU_ANONYMOUS_NAMESPACE_END
 
 #endif // LOGURU_IMPLEMENTATION
