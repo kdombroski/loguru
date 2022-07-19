@@ -53,6 +53,7 @@
 
 #ifdef _WIN32
 	#include <direct.h>
+	#include <share.h>
 
 	#define localtime_r(a, b) localtime_s(b, a) // No localtime_r with MSVC, but arguments are swapped for localtime_s
 #else
@@ -128,7 +129,9 @@
 		#define _WIN32_WINNT 0x0502
 	#endif
 	#define WIN32_LEAN_AND_MEAN
-	#define NOMINMAX
+	#ifndef NOMINMAX
+		#define NOMINMAX
+	#endif
 	#include <windows.h>
 #endif
 
@@ -580,16 +583,16 @@ namespace loguru
 	Text errno_as_text()
 	{
 		char buff[256];
-	#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+	#if defined(_WIN32)
+		strerror_s(buff, sizeof(buff), errno);
+		return Text(STRDUP(buff));
+	#elif defined(__GLIBC__) && defined(_GNU_SOURCE)
 		// GNU Version
 		return Text(STRDUP(strerror_r(errno, buff, sizeof(buff))));
 	#elif defined(__APPLE__) || _POSIX_C_SOURCE >= 200112L
 		// XSI Version
 		strerror_r(errno, buff, sizeof(buff));
 		return Text(strdup(buff));
-	#elif defined(_WIN32)
-		strerror_s(buff, sizeof(buff), errno);
-		return Text(STRDUP(buff));
 	#else
 		// Not thread-safe.
 		(void)buff;

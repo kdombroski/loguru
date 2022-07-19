@@ -17,7 +17,7 @@ endif()
 add_library(loguru STATIC loguru.cpp)
 add_library(loguru::loguru ALIAS loguru)
 
-target_link_libraries(loguru PUBLIC dl Threads::Threads fmt::fmt)
+target_link_libraries(loguru PUBLIC Threads::Threads fmt::fmt)
 target_compile_definitions(loguru PUBLIC LOGURU_USE_FMTLIB)
 target_include_directories(loguru PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/>"
