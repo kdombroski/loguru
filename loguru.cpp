@@ -35,6 +35,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <climits>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -574,7 +575,11 @@ namespace loguru
 			else if (c == '\'') { out += "\\\'"; }
 			else if (c == '\"') { out += "\\\""; }
 			else if (c == ' ')  { out += "\\ ";  }
+#if CHAR_MIN < 0
 			else if (0 <= c && c < 0x20) { // ASCI control character:
+#else
+			else if (c < 0x20) { // ASCI control character:
+#endif
 			// else if (c < 0x20 || c != (c & 127)) { // ASCII control character or UTF-8:
 				out += "\\x";
 				write_hex_byte(out, static_cast<uint8_t>(c));
@@ -1859,7 +1864,11 @@ namespace loguru
 		else if (c == '\n') { str += "\\n";  }
 		else if (c == '\r') { str += "\\r";  }
 		else if (c == '\t') { str += "\\t";  }
+#if CHAR_MIN < 0
 		else if (0 <= c && c < 0x20) {
+#else
+		else if (c < 0x20) {
+#endif
 			str += "\\u";
 			write_hex_16(static_cast<uint16_t>(c));
 		} else { str += c; }
