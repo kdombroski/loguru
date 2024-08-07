@@ -2,7 +2,7 @@
 # Maintainer: Emil Ernerfeldt <emil.ernerfeldt@gmail.com>
 pkgname=mbi-loguru-dev
 pkgver=2.1.0
-pkgrel=24
+pkgrel=25
 pkgdesc="A lightweight C++ logging library"
 url="https://github.com/emilk/loguru"
 arch="all"
