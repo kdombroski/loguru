@@ -1568,13 +1568,14 @@ namespace loguru
 		s_needs_flushing = false;
 	}
 
-	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, va_list vlist) :
+#if !LOGURU_USE_FMTLIB
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, LOGURU_FORMAT_STRING_TYPEformat, va_list vlist) :
 		_verbosity(verbosity), _file(file), _line(line)
 	{
 		this->Init(format, vlist);
 	}
 
-	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, ...) :
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, LOGURU_FORMAT_STRING_TYPE, ...) :
 		_verbosity(verbosity), _file(file), _line(line)
 	{
 		va_list vlist;
@@ -1582,6 +1583,7 @@ namespace loguru
 		this->Init(format, vlist);
 		va_end(vlist);
 	}
+#endif // LOGURU_USE_FMTLIB?
 
 	LogScopeRAII::~LogScopeRAII()
 	{
@@ -1613,13 +1615,22 @@ namespace loguru
 		}
 	}
 
+#if LOGURU_USE_FMTLIB
+	void LogScopeRAII::Init(LOGURU_FORMAT_STRING_TYPE format, fmt::format_args args)
+#else // LOGURU_USE_FMTLIB?
 	void LogScopeRAII::Init(const char* format, va_list vlist)
+#endif // LOGURU_USE_FMTLIB?
 	{
 		if (_verbosity <= current_verbosity_cutoff()) {
 			std::lock_guard<std::recursive_mutex> lock(s_mutex);
 			_indent_stderr = (_verbosity <= g_stderr_verbosity);
 			_start_time_ns = now_ns();
+#if LOGURU_USE_FMTLIB
+			auto fr = fmt::vformat_to_n(_name, sizeof(_name) - 1, format, args);
+			_name[fr.size] = 0; // null terminator
+#else // LOGURU_USE_FMTLIB?
 			vsnprintf(_name, sizeof(_name), format, vlist);
+#endif // LOGURU_USE_FMTLIB?
 			log_to_everywhere(1, _verbosity, _file, _line, "{ ", _name);
 
 			if (_indent_stderr) {
