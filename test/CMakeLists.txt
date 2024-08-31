@@ -27,7 +27,8 @@ endif() # Clang
 add_executable(loguru_test loguru_test.cpp)
 
 find_package(Threads)
-target_link_libraries(loguru_test ${CMAKE_THREAD_LIBS_INIT}) # For pthreads
+find_package(fmt)
+target_link_libraries(loguru_test ${CMAKE_THREAD_LIBS_INIT} fmt::fmt) # For pthreads
 if(NOT WIN32)
     target_link_libraries(loguru_test dl) # For ldl
 endif()
