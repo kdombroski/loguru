@@ -2,7 +2,6 @@
 #define LOGURU_FILENAME_WIDTH  16
 #define LOGURU_WITH_STREAMS     1
 #define LOGURU_REDEFINE_ASSERT  1
-#define LOGURU_USE_FMTLIB       0
 #define LOGURU_WITH_FILEABS     0
 // #define LOGURU_STACKTRACES      1
 // #define LOGURU_RTTI             1
@@ -15,7 +14,7 @@
 #include <fstream>
 
 void the_one_where_the_problem_is(const std::vector<std::string>& v) {
-	ABORT_F("Abort deep in stack trace, msg: %s", v[0].c_str());
+	ABORT_F("Abort deep in stack trace, msg: {}", v[0]);
 }
 void deep_abort_1(const std::vector<std::string>& v) { the_one_where_the_problem_is(v); }
 void deep_abort_2(const std::vector<std::string>& v) { deep_abort_1(v); }
@@ -30,7 +29,7 @@ void deep_abort_10(const std::vector<std::string>& v) { deep_abort_9(v); }
 
 void sleep_ms(int ms)
 {
-	LOG_F(3, "Sleeping for %d ms", ms);
+	LOG_F(3, "Sleeping for {} ms", ms);
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
@@ -41,27 +40,27 @@ void test_thread_names()
 	{
 		char thread_name[17];
 		loguru::get_thread_name(thread_name, sizeof(thread_name), false);
-		LOG_F(INFO, "Hello from main thread ('%s')", thread_name);
+		LOG_F(INFO, "Hello from main thread ('{}')", thread_name);
 	}
 
 	auto a = std::thread([](){
 		char thread_name[17];
 		loguru::get_thread_name(thread_name, sizeof(thread_name), false);
-		LOG_F(INFO, "Hello from nameless thread ('%s')", thread_name);
+		LOG_F(INFO, "Hello from nameless thread ('{}')", thread_name);
 	});
 
 	auto b = std::thread([](){
 		loguru::set_thread_name("renderer");
 		char thread_name[17];
 		loguru::get_thread_name(thread_name, sizeof(thread_name), false);
-		LOG_F(INFO, "Hello from render thread ('%s')", thread_name);
+		LOG_F(INFO, "Hello from render thread ('{}')", thread_name);
 	});
 
 	auto c = std::thread([](){
 		loguru::set_thread_name("abcdefghijklmnopqrstuvwxyz");
 		char thread_name[17];
 		loguru::get_thread_name(thread_name, sizeof(thread_name), false);
-		LOG_F(INFO, "Hello from thread with a very long name ('%s')", thread_name);
+		LOG_F(INFO, "Hello from thread with a very long name ('{}')", thread_name);
 	});
 
 	a.join();
@@ -131,7 +130,7 @@ int main_test(int argc, char* argv[])
 	LOG_SCOPE_FUNCTION(INFO);
 	LOG_F(INFO, "Doing some stuff...");
 	for (int i=0; i<2; ++i) {
-		LOG_SCOPE_F(1, "Iteration %d", i);
+		LOG_SCOPE_F(1, "Iteration {}", i);
 		auto result = some_expensive_operation();
 		LOG_IF_F(WARNING, result == BAD, "Bad result");
 	}
@@ -229,7 +228,7 @@ void throw_on_fatal()
 		try {
 			CHECK_F(false, "some CHECK_F message");
 		} catch (std::runtime_error& e) {
-			LOG_F(INFO, "CHECK_F threw this: '%s'", e.what());
+			LOG_F(INFO, "CHECK_F threw this: '{}'", e.what());
 		}
 	}
 #if LOGURU_WITH_STREAMS
@@ -238,7 +237,7 @@ void throw_on_fatal()
 		try {
 			CHECK_S(false) << "Some CHECK_S message";
 		} catch (std::runtime_error& e) {
-			LOG_F(INFO, "CHECK_S threw this: '%s'", e.what());
+			LOG_F(INFO, "CHECK_S threw this: '{}'", e.what());
 		}
 	}
 	LOG_F(INFO, "Trying an uncaught exception:");
@@ -274,19 +273,19 @@ struct CallbackTester
 
 void callbackPrint(void* user_data, const loguru::Message& message)
 {
-	printf("Custom callback: %s%s\n", message.prefix, message.message);
+	fmt::print("Custom callback: {}{}\n", message.prefix, message.message);
 	reinterpret_cast<CallbackTester*>(user_data)->num_print += 1;
 }
 
 void callbackFlush(void* user_data)
 {
-	printf("Custom callback flush\n");
+	fmt::print("Custom callback flush\n");
 	reinterpret_cast<CallbackTester*>(user_data)->num_flush += 1;
 }
 
 void callbackClose(void* user_data)
 {
-	printf("Custom callback close\n");
+	fmt::print("Custom callback close\n");
 	reinterpret_cast<CallbackTester*>(user_data)->num_close += 1;
 }
 
@@ -335,7 +334,7 @@ int main(int argc, char* argv[])
 	loguru::init(argc, argv);
 
 	// auto verbose_type_name = loguru::demangle(typeid(std::ofstream).name());
-	// loguru::add_stack_cleanup(verbose_type_name.c_str(), "std::ofstream");
+	// loguru::add_stack_cleanup(verbose_type_name, "std::ofstream");
 	// std::ofstream os;
 	// die(os);
 
@@ -399,7 +398,7 @@ int main(int argc, char* argv[])
 			CHECK_EQ_F(always_increasing(), 42, "Should fail");
 		} else if (test == "CHECK_EQ_S") {
 			std::string str = "right";
-			CHECK_EQ_F(str, "wrong", "Expected to fail, since `str` isn't \"wrong\" but \"%s\"", str.c_str());
+			CHECK_EQ_F(str, "wrong", "Expected to fail, since `str` isn't \"wrong\" but \"{}\"", str);
 		} else if (test == "CHECK_LT_S") {
 			CHECK_EQ_F(always_increasing(), 0);
 			CHECK_EQ_F(always_increasing(), 1);
@@ -426,7 +425,7 @@ int main(int argc, char* argv[])
 			loguru::add_file("hang.log", loguru::Truncate, loguru::Verbosity_INFO);
 			test_hang_2();
 		} else {
-			LOG_F(ERROR, "Unknown test: '%s'", test.c_str());
+			LOG_F(ERROR, "Unknown test: '{}'", test);
 		}
 	}
 }
