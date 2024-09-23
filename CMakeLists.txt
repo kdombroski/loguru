@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(LOGURU_USE_FMTLIB "Enable formatting with fmtlib" ON)
 option(LOGURU_INSTALL "Enable install targets" ON)
 option(LOGURU_TESTING "Enable tests" ON)
+option(LOGURU_PIC "Build position independent code" OFF)
 
 include(CheckLibraryExists)
 
@@ -47,6 +48,11 @@ endif()
 
 # files in public_header property get installed
 set_target_properties(loguru PROPERTIES PUBLIC_HEADER "loguru.hpp")
+
+# position independent code is important when building shared libraries
+if(LOGURU_PIC)
+    set_target_properties(loguru PROPERTIES POSITION_INDEPENDENT_CODE ${LOGURU_PIC})
+endif()
 
 if(ENABLE_TESTS)
     add_executable(tests test/loguru_test.cpp)
