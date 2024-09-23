@@ -323,6 +323,7 @@ namespace loguru
 #undef WARNING
 #undef INFO
 #undef MAX
+#undef DBG
 
 	enum NamedVerbosity : Verbosity
 	{
@@ -342,6 +343,9 @@ namespace loguru
 
 		// Same as Verbosity_INFO in every way.
 		Verbosity_0       =  0,
+
+		// Debug messages. By default, not written anywhere.
+		Verbosity_DBG     = +1,
 
 		// Verbosity levels 1-9 are generally not written to stderr, but are written to file.
 		Verbosity_1       = +1,

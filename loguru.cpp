@@ -963,6 +963,8 @@ namespace loguru
 				name = "WARN";
 			} else if (verbosity == Verbosity_INFO) {
 				name = "INFO";
+			} else if (verbosity == Verbosity_DBG) {
+				name = "DBG";
 			}
 		}
 
@@ -989,6 +991,8 @@ namespace loguru
 				verbosity = Verbosity_ERROR;
 			} else if (strcmp(name, "FATAL") == 0) {
 				verbosity = Verbosity_FATAL;
+			} else if (strcmp(name, "DEBUG") == 0 || strcmp(name, "DBG") == 0) {
+				verbosity = Verbosity_DBG;
 			}
 		}
 
